@@ -8,11 +8,12 @@
 
 import UIKit
 
-class ExtraView: UIView {
+class ExtraView: UIView, ThemedView {
     
     var globalColors: GlobalColors.Type?
     var darkMode: Bool
     var solidColorMode: Bool
+    let height : Double = 30
     
     required init(globalColors: GlobalColors.Type?, darkMode: Bool, solidColorMode: Bool) {
         self.globalColors = globalColors

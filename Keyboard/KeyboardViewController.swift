@@ -9,11 +9,6 @@
 import UIKit
 import AudioToolbox
 
-let metrics: [String:Double] = [
-    "topBanner": 30
-]
-func metric(name: String) -> CGFloat { return CGFloat(metrics[name]!) }
-
 // TODO: move this somewhere else and localize
 let kAutoCapitalization = "kAutoCapitalization"
 let kPeriodShortcut = "kPeriodShortcut"
@@ -21,6 +16,7 @@ let kKeyboardClicks = "kKeyboardClicks"
 let kSmallLowercase = "kSmallLowercase"
 
 class KeyboardViewController: UIInputViewController {
+    let defaultTopBanner = 30
     
     let backspaceDelay: NSTimeInterval = 0.5
     let backspaceRepeat: NSTimeInterval = 0.07
@@ -30,8 +26,8 @@ class KeyboardViewController: UIInputViewController {
     var layout: KeyboardLayout?
     var heightConstraint: NSLayoutConstraint?
     
-    var bannerView: ExtraView?
-    var settingsView: ExtraView?
+    var bannerView: UIView?
+    var settingsView: UIView?
     
     var currentMode: Int {
         didSet {
@@ -229,7 +225,9 @@ class KeyboardViewController: UIInputViewController {
             self.setupKeys()
         }
         
-        self.bannerView?.frame = CGRectMake(0, 0, self.view.bounds.width, metric("topBanner"))
+        var themedView = self.bannerView as? ThemedView
+        
+        self.bannerView?.frame = CGRectMake(0, 0, self.view.bounds.width, CGFloat(themedView?.height ?? self.defaultTopBanner))
         
         let newOrigin = CGPointMake(0, self.view.bounds.height - self.forwardingView.bounds.height)
         self.forwardingView.frame.origin = newOrigin
@@ -281,7 +279,8 @@ class KeyboardViewController: UIInputViewController {
         let actualScreenWidth = (UIScreen.mainScreen().nativeBounds.size.width / UIScreen.mainScreen().nativeScale)
         let canonicalPortraitHeight = (isPad ? CGFloat(264) : CGFloat(orientation.isPortrait && actualScreenWidth >= 400 ? 226 : 216))
         let canonicalLandscapeHeight = (isPad ? CGFloat(352) : CGFloat(162))
-        let topBannerHeight = (withTopBanner ? metric("topBanner") : 0)
+        var themedView = self.bannerView as? ThemedView
+        let topBannerHeight = CGFloat((withTopBanner ? (themedView?.height ?? 0) : 0))
         
         return CGFloat(orientation.isPortrait ? canonicalPortraitHeight + topBannerHeight : canonicalLandscapeHeight + topBannerHeight)
     }
@@ -427,8 +426,11 @@ class KeyboardViewController: UIInputViewController {
         self.layout?.darkMode = appearanceIsDark
         self.layout?.updateKeyAppearance()
         
-        self.bannerView?.darkMode = appearanceIsDark
-        self.settingsView?.darkMode = appearanceIsDark
+        var themedView = self.bannerView as? ThemedView
+        themedView?.darkMode = appearanceIsDark
+        
+        themedView = self.settingsView as? ThemedView
+        themedView?.darkMode = appearanceIsDark
     }
     
     func highlightKey(sender: KeyboardKey) {
@@ -534,6 +536,20 @@ class KeyboardViewController: UIInputViewController {
         
         if let textDocumentProxy = self.textDocumentProxy as? UIKeyInput {
             textDocumentProxy.deleteBackward()
+
+            var documentProxy = self.textDocumentProxy as? UITextDocumentProxy
+            if (documentProxy != nil) {
+                
+                var contextString = ""
+                if ((documentProxy!.hasText())){
+                    contextString = documentProxy!.documentContextBeforeInput
+                }
+                
+                NSNotificationCenter.defaultCenter().postNotificationName(
+                    "inputChanged",
+                    object: nil,
+                    userInfo: ["text" : contextString])
+            }
         }
         self.setCapsIfNeeded()
         
@@ -555,6 +571,20 @@ class KeyboardViewController: UIInputViewController {
         
         if let textDocumentProxy = self.textDocumentProxy as? UIKeyInput {
             textDocumentProxy.deleteBackward()
+            
+            var documentProxy = self.textDocumentProxy as? UITextDocumentProxy
+            if (documentProxy != nil) {
+                
+                var contextString = ""
+                if ((documentProxy!.hasText())){
+                    contextString = documentProxy!.documentContextBeforeInput
+                }
+                
+                NSNotificationCenter.defaultCenter().postNotificationName(
+                    "inputChanged",
+                    object: nil,
+                    userInfo: ["text" : contextString])
+            }
         }
         self.setCapsIfNeeded()
     }
@@ -658,7 +688,8 @@ class KeyboardViewController: UIInputViewController {
         // lazy load settings
         if self.settingsView == nil {
             if var aSettings = self.createSettings() {
-                aSettings.darkMode = self.darkMode()
+                var themedSettings = aSettings as? ThemedView
+                themedSettings?.darkMode = self.darkMode()
                 
                 aSettings.hidden = true
                 self.view.addSubview(aSettings)
@@ -831,14 +862,14 @@ class KeyboardViewController: UIInputViewController {
     }
     
     // a banner that sits in the empty space on top of the keyboard
-    func createBanner() -> ExtraView? {
+    func createBanner() -> UIView? {
         // note that dark mode is not yet valid here, so we just put false for clarity
         //return ExtraView(globalColors: self.dynamicType.globalColors, darkMode: false, solidColorMode: self.solidColorMode())
         return nil
     }
     
     // a settings view that replaces the keyboard when the settings button is pressed
-    func createSettings() -> ExtraView? {
+    func createSettings() -> UIView? {
         // note that dark mode is not yet valid here, so we just put false for clarity
         var settingsView = DefaultSettings(globalColors: self.dynamicType.globalColors, darkMode: false, solidColorMode: self.solidColorMode())
         settingsView.backButton?.addTarget(self, action: Selector("toggleSettings"), forControlEvents: UIControlEvents.TouchUpInside)
